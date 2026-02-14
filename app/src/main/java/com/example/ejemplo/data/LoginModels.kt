@@ -1,22 +1,34 @@
 package com.example.ejemplo.data
 
-// Lo que enviamos al servidor
+// --- LOGIN ---
 data class LoginRequest(
     val email: String,
     val password: String
 )
+
+data class LoginResponse(
+    val message: String,
+    val access_token: String,
+    val user: Usuario
+)
+
+// --- REGISTRO ---
 data class RegisterRequest(
     val name: String,
     val email: String,
     val password: String,
-    val password_confirmation: String, // Laravel exige esto si usas la regla 'confirmed'
-    val cedula: String? = null,
-    val telefono: String? = null
+    val cedula: String,
+    val telefono: String
 )
 
-// Lo que el servidor nos responde (según lo que programamos en Laravel)
-data class LoginResponse(
+data class RegisterResponse(
     val message: String,
     val access_token: String,
-    val user: Usuario // Reutilizamos tu clase Usuario existente
+    val user: Usuario
+)
+
+// --- NOTIFICACIONES ---
+// Arregla el error "Too many arguments for constructor(): FcmTokenRequest"
+data class FcmTokenRequest(
+    val fcm_token: String
 )

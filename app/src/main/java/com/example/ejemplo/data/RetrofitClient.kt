@@ -12,30 +12,32 @@ import retrofit2.http.POST
 import retrofit2.http.Part
 
 interface ApiService {
-    // Login
+    // --- AUTENTICACIÓN ---
     @POST("login")
     suspend fun login(@Body request: LoginRequest): LoginResponse
 
-    //Registro
-    @POST("register")
-    suspend fun register(@Body request: RegisterRequest): LoginResponse
+    @POST("register") // <--- FALTABA ESTO
+    suspend fun register(@Body request: RegisterRequest): RegisterResponse
 
-    // Perfil
+    // --- PERFIL Y TOKEN ---
     @GET("perfil")
     suspend fun obtenerPerfil(@Header("Authorization") token: String): Usuario
+
+    @POST("perfil/fcm-token") // <--- FALTABA ESTO
+    suspend fun actualizarTokenFcm(@Header("Authorization") token: String, @Body request: FcmTokenRequest): Any
 
     @Multipart
     @POST("perfil/foto")
     suspend fun subirFotoPerfil(@Header("Authorization") token: String, @Part foto: MultipartBody.Part): ReporteResponse
 
-    // Alertas de Pánico
+    // --- ALERTAS ---
     @POST("alertas")
     suspend fun enviarAlerta(@Header("Authorization") token: String, @Body request: AlertaRequest): AlertaResponse
 
     @GET("mis-alertas")
     suspend fun obtenerMisAlertas(@Header("Authorization") token: String): List<AlertaItem>
 
-    // --- ESTA ES LA FUNCIÓN QUE ARREGLA EL ERROR EN REPORTSCREEN ---
+    // --- INCIDENTES ---
     @Multipart
     @POST("incidentes")
     suspend fun enviarReporte(
@@ -46,11 +48,11 @@ interface ApiService {
         @Part("longitud") longitud: RequestBody,
         @Part foto: MultipartBody.Part?
     ): ReporteResponse
-    // ---------------------------------------------------------------
 
     @GET("incidentes")
     suspend fun obtenerMisReportes(@Header("Authorization") token: String): List<ReporteItem>
 
+    // --- OTROS ---
     @GET("noticias")
     suspend fun obtenerNoticias(@Header("Authorization") token: String): List<Noticia>
 
@@ -59,7 +61,6 @@ interface ApiService {
 }
 
 object RetrofitClient {
-    // Usamos la constante centralizada
     private const val BASE_URL = Config.API_URL
 
     val api: ApiService by lazy {

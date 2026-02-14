@@ -17,7 +17,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Configuración del Worker (Background)
+        // Configuración del Worker (Fondo)
         val workRequest = PeriodicWorkRequestBuilder<NotificationWorker>(15, TimeUnit.MINUTES)
             .setConstraints(
                 Constraints.Builder()
@@ -35,16 +35,13 @@ class MainActivity : ComponentActivity() {
         val session = SessionManager(this)
 
         setContent {
-            // Control de navegación
             var currentScreen by remember {
                 mutableStateOf(if (session.fetchAuthToken() != null) "home" else "login")
             }
 
-            // Pestaña inicial del Home
             var homeStartTab by remember { mutableIntStateOf(0) }
 
             when (currentScreen) {
-                // 1. PANTALLA LOGIN
                 "login" -> {
                     LoginScreen(
                         onLoginSuccess = { token, name ->
@@ -52,14 +49,12 @@ class MainActivity : ComponentActivity() {
                             homeStartTab = 0
                             currentScreen = "home"
                         },
-                        // Acción para ir al registro
                         onNavigateToRegister = {
-                            currentScreen = "register"
+                            currentScreen = "register" // <--- Navegación al registro
                         }
                     )
                 }
 
-                // 2. NUEVA PANTALLA DE REGISTRO
                 "register" -> {
                     RegisterScreen(
                         onRegisterSuccess = { token, name ->
@@ -67,13 +62,10 @@ class MainActivity : ComponentActivity() {
                             homeStartTab = 0
                             currentScreen = "home"
                         },
-                        onBackToLogin = {
-                            currentScreen = "login"
-                        }
+                        onBack = { currentScreen = "login" }
                     )
                 }
 
-                // 3. PANTALLA PRINCIPAL (HOME)
                 "home" -> {
                     HomeScreen(
                         initialTab = homeStartTab,
@@ -81,57 +73,22 @@ class MainActivity : ComponentActivity() {
                             session.clearSession()
                             currentScreen = "login"
                         },
-                        onNavigateToReport = {
-                            homeStartTab = 0
-                            currentScreen = "reporte"
-                        },
-                        onNavigateToHistory = {
-                            homeStartTab = 3
-                            currentScreen = "historial"
-                        },
-                        onNavigateToAlerts = {
-                            homeStartTab = 3
-                            currentScreen = "mis_alertas"
-                        },
-                        onNavigateToSettings = {
-                            homeStartTab = 3
-                            currentScreen = "configuracion"
-                        },
-                        onNavigateToSupport = {
-                            homeStartTab = 3
-                            currentScreen = "soporte"
-                        },
-                        onNavigateToProfile = {
-                            homeStartTab = 3
-                            currentScreen = "user_profile"
-                        }
+                        onNavigateToReport = { homeStartTab = 0; currentScreen = "reporte" },
+                        onNavigateToHistory = { homeStartTab = 3; currentScreen = "historial" },
+                        onNavigateToAlerts = { homeStartTab = 3; currentScreen = "mis_alertas" },
+                        onNavigateToSettings = { homeStartTab = 3; currentScreen = "configuracion" },
+                        onNavigateToSupport = { homeStartTab = 3; currentScreen = "soporte" },
+                        onNavigateToProfile = { homeStartTab = 3; currentScreen = "user_profile" }
                     )
                 }
 
-                // 4. PANTALLAS SECUNDARIAS
-                "reporte" -> {
-                    ReportScreen(onBack = { currentScreen = "home" })
-                }
-
-                "historial" -> {
-                    MyReportsScreen(onBack = { currentScreen = "home" })
-                }
-
-                "mis_alertas" -> {
-                    MyAlertsScreen(onBack = { currentScreen = "home" })
-                }
-
-                "soporte" -> {
-                    SupportScreen(onBack = { currentScreen = "home" })
-                }
-
-                "configuracion" -> {
-                    SettingsScreen(onBack = { currentScreen = "home" })
-                }
-
-                "user_profile" -> {
-                    UserProfileScreen(onBack = { currentScreen = "home" })
-                }
+                // ... tus otras pantallas ...
+                "reporte" -> ReportScreen(onBack = { currentScreen = "home" })
+                "historial" -> MyReportsScreen(onBack = { currentScreen = "home" })
+                "mis_alertas" -> MyAlertsScreen(onBack = { currentScreen = "home" })
+                "soporte" -> SupportScreen(onBack = { currentScreen = "home" })
+                "configuracion" -> SettingsScreen(onBack = { currentScreen = "home" })
+                "user_profile" -> UserProfileScreen(onBack = { currentScreen = "home" })
             }
         }
     }

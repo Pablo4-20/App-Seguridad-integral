@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "642658102603",
+    "project_id": "seguridad-integral-25f6d",
+    "storage_bucket": "seguridad-integral-25f6d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:642658102603:android:b0df0836b4173c03e6ccce",
+        "android_client_info": {
+          "package_name": "com.example.ejemplo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD4XQcFiuXejz7aZGjzrH3g82RZvHLMRRc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

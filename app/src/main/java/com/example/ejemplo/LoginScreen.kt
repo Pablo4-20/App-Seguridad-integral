@@ -1,5 +1,6 @@
 package com.example.ejemplo
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -28,15 +29,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ejemplo.components.NoInternetScreen
 import com.example.ejemplo.utils.NetworkUtils
+// IMPORTS DE DATOS
 import com.example.ejemplo.data.LoginRequest
 import com.example.ejemplo.data.RetrofitClient
-import kotlinx.coroutines.launch
+import com.example.ejemplo.data.FcmTokenRequest
+// IMPORTS DE FIREBASE Y CORRUTINAS
+import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.launch // <--- ESTE ES EL QUE FALTABA
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
     onLoginSuccess: (String, String) -> Unit,
-    onNavigateToRegister: () -> Unit // <--- NUEVO PARAMETRO
+    onNavigateToRegister: () -> Unit // Parámetro para navegar al registro
 ) {
 
     val context = LocalContext.current
@@ -97,9 +102,7 @@ fun LoginScreen(
                     Image(
                         painter = painterResource(id = R.drawable.urg),
                         contentDescription = "Logo",
-                        modifier = Modifier
-                            .height(150.dp)
-                            .fillMaxWidth(),
+                        modifier = Modifier.height(150.dp).fillMaxWidth(),
                         contentScale = ContentScale.Fit
                     )
 
@@ -175,8 +178,34 @@ fun LoginScreen(
                                 isLoading = true
                                 scope.launch {
                                     try {
+                                        // 1. LOGIN
                                         val request = LoginRequest(email, password)
                                         val response = RetrofitClient.api.login(request)
+
+                                        // 2. OBTENER Y ENVIAR TOKEN FCM
+                                        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                                            if (task.isSuccessful) {
+                                                val tokenFcm = task.result
+                                                Log.d("FCM", "Token obtenido: $tokenFcm")
+
+                                                // Necesitamos 'scope.launch' porque addOnCompleteListener es código Java/Callback
+                                                // y no una función suspendida directa.
+                                                scope.launch {
+                                                    try {
+                                                        RetrofitClient.api.actualizarTokenFcm(
+                                                            "Bearer ${response.access_token}",
+                                                            FcmTokenRequest(tokenFcm)
+                                                        )
+                                                        Log.d("FCM", "Token enviado al servidor")
+                                                    } catch (e: Exception) {
+                                                        Log.e("FCM", "Error enviando token", e)
+                                                    }
+                                                }
+                                            } else {
+                                                Log.w("FCM", "Error obteniendo token FCM", task.exception)
+                                            }
+                                        }
+
                                         isLoading = false
                                         Toast.makeText(context, "Bienvenido ${response.user.nombre}", Toast.LENGTH_SHORT).show()
                                         onLoginSuccess(response.access_token, response.user.nombre)
@@ -201,7 +230,6 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // --- NUEVO BOTÓN DE REGISTRO ---
                     TextButton(onClick = onNavigateToRegister) {
                         Text("¿No tienes cuenta? Regístrate aquí", color = DarkBlue)
                     }
