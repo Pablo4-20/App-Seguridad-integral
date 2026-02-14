@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.RingtoneManager
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -13,22 +14,26 @@ import com.google.firebase.messaging.RemoteMessage
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
 
+    // ESTO SE EJECUTA CUANDO LA APP ESTÁ ABIERTA O EN PRIMER PLANO
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
-        super.onMessageReceived(remoteMessage)
-        // Muestra la notificación si la app está abierta
+        Log.d("FCM", "¡Mensaje recibido!: ${remoteMessage.from}")
+
+        // Extraer título y cuerpo de la notificación
         remoteMessage.notification?.let {
+            Log.d("FCM", "Datos: ${it.title} - ${it.body}")
             mostrarNotificacion(it.title, it.body)
         }
     }
 
+    // Se ejecuta si Firebase decide cambiar tu token de seguridad
     override fun onNewToken(token: String) {
-        super.onNewToken(token)
-        Log.d("FCM", "Nuevo token generado: $token")
-        // Aquí podrías guardar el token localmente si fuera necesario
+        Log.d("FCM", "Refreshed token: $token")
+        // Aquí podrías enviar el token al backend si quisieras
     }
 
-    private fun mostrarNotificacion(titulo: String?, cuerpo: String?) {
-        val channelId = "seguridad_ueb_channel"
+    private fun mostrarNotificacion(title: String?, body: String?) {
+        val channelId = "seguridad_ueb_channel" // Debe coincidir con el AndroidManifest.xml
+
         val intent = Intent(this, MainActivity::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
@@ -37,26 +42,30 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val builder = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.drawable.ic_launcher_foreground) // Asegúrate de que este recurso exista
-            .setContentTitle(titulo)
-            .setContentText(cuerpo)
+        val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
+        // Construir la alerta visual
+        val notificationBuilder = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(android.R.drawable.ic_dialog_info) // Icono por defecto de Android
+            .setContentTitle(title ?: "Nueva Notificación")
+            .setContentText(body)
             .setAutoCancel(true)
+            .setSound(defaultSoundUri)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
 
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // Crear el canal de notificaciones (Obligatorio para Android 8.0+)
+        // Crear el canal si es Android 8 o superior (Obligatorio)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
                 "Noticias Seguridad",
                 NotificationManager.IMPORTANCE_HIGH
             )
-            manager.createNotificationChannel(channel)
+            notificationManager.createNotificationChannel(channel)
         }
 
-        manager.notify(System.currentTimeMillis().toInt(), builder.build())
+        notificationManager.notify(0, notificationBuilder.build())
     }
 }
