@@ -1,23 +1,33 @@
 package com.example.ejemplo
 
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
-import com.example.ejemplo.data.SessionManager
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.Constraints
-import java.util.concurrent.TimeUnit
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.work.*
+import com.example.ejemplo.data.SessionManager
+import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Configuración del Worker (Fondo)
+        // 1. OBLIGATORIO: Crear el canal de notificaciones (Android 8+)
+        crearCanalNotificaciones()
+
+        // 2. OBLIGATORIO: Pedir permiso explícito (Android 13+)
+        // Si no se ejecuta esto, no aparecerá la opción de permitir notificaciones.
+        solicitarPermisoNotificaciones()
+
+        // Configuración del Worker (Segundo plano)
         val workRequest = PeriodicWorkRequestBuilder<NotificationWorker>(15, TimeUnit.MINUTES)
             .setConstraints(
                 Constraints.Builder()
@@ -49,12 +59,9 @@ class MainActivity : ComponentActivity() {
                             homeStartTab = 0
                             currentScreen = "home"
                         },
-                        onNavigateToRegister = {
-                            currentScreen = "register" // <--- Navegación al registro
-                        }
+                        onNavigateToRegister = { currentScreen = "register" }
                     )
                 }
-
                 "register" -> {
                     RegisterScreen(
                         onRegisterSuccess = { token, name ->
@@ -65,7 +72,6 @@ class MainActivity : ComponentActivity() {
                         onBack = { currentScreen = "login" }
                     )
                 }
-
                 "home" -> {
                     HomeScreen(
                         initialTab = homeStartTab,
@@ -81,14 +87,45 @@ class MainActivity : ComponentActivity() {
                         onNavigateToProfile = { homeStartTab = 3; currentScreen = "user_profile" }
                     )
                 }
-
-                // ... tus otras pantallas ...
                 "reporte" -> ReportScreen(onBack = { currentScreen = "home" })
                 "historial" -> MyReportsScreen(onBack = { currentScreen = "home" })
                 "mis_alertas" -> MyAlertsScreen(onBack = { currentScreen = "home" })
                 "soporte" -> SupportScreen(onBack = { currentScreen = "home" })
                 "configuracion" -> SettingsScreen(onBack = { currentScreen = "home" })
                 "user_profile" -> UserProfileScreen(onBack = { currentScreen = "home" })
+            }
+        }
+    }
+
+    // --- FUNCIONES CRÍTICAS QUE FALTABAN ---
+
+    private fun crearCanalNotificaciones() {
+        // En Android 8.0+ las notificaciones DEBEN tener un canal asignado
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channelId = "seguridad_ueb_channel"
+            val name = "Noticias Seguridad"
+            val descriptionText = "Canal para noticias y alertas de seguridad"
+            val importance = NotificationManager.IMPORTANCE_HIGH
+            val channel = NotificationChannel(channelId, name, importance).apply {
+                description = descriptionText
+            }
+            val notificationManager: NotificationManager =
+                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun solicitarPermisoNotificaciones() {
+        // En Android 13+ (Tiramisu) se debe pedir permiso en tiempo de ejecución
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    101
+                )
             }
         }
     }
