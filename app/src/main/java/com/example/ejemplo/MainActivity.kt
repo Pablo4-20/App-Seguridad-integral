@@ -7,27 +7,37 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.work.*
+import com.example.ejemplo.data.FcmTokenRequest
+import com.example.ejemplo.data.RetrofitClient
 import com.example.ejemplo.data.SessionManager
+import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 1. OBLIGATORIO: Crear el canal de notificaciones (Android 8+)
+        // 1. Canales y Permisos
         crearCanalNotificaciones()
-
-        // 2. OBLIGATORIO: Pedir permiso explícito (Android 13+)
-        // Si no se ejecuta esto, no aparecerá la opción de permitir notificaciones.
         solicitarPermisoNotificaciones()
 
-        // Configuración del Worker (Segundo plano)
+        val session = SessionManager(this)
+
+        // 2. RECUPERADO: Si ya está logueado, actualizar el token inmediatamente
+        if (session.fetchAuthToken() != null) {
+            sincronizarTokenFCM(session)
+        }
+
+        // Configuración del Worker (Tu código de fondo)
         val workRequest = PeriodicWorkRequestBuilder<NotificationWorker>(15, TimeUnit.MINUTES)
             .setConstraints(
                 Constraints.Builder()
@@ -42,13 +52,10 @@ class MainActivity : ComponentActivity() {
             workRequest
         )
 
-        val session = SessionManager(this)
-
         setContent {
             var currentScreen by remember {
                 mutableStateOf(if (session.fetchAuthToken() != null) "home" else "login")
             }
-
             var homeStartTab by remember { mutableIntStateOf(0) }
 
             when (currentScreen) {
@@ -56,6 +63,9 @@ class MainActivity : ComponentActivity() {
                     LoginScreen(
                         onLoginSuccess = { token, name ->
                             session.saveAuthToken(token, name)
+                            // 3. RECUPERADO: Enviar token al entrar
+                            sincronizarTokenFCM(session)
+
                             homeStartTab = 0
                             currentScreen = "home"
                         },
@@ -66,6 +76,9 @@ class MainActivity : ComponentActivity() {
                     RegisterScreen(
                         onRegisterSuccess = { token, name ->
                             session.saveAuthToken(token, name)
+                            // 3. RECUPERADO: Enviar token al registrarse
+                            sincronizarTokenFCM(session)
+
                             homeStartTab = 0
                             currentScreen = "home"
                         },
@@ -97,10 +110,34 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // --- FUNCIONES CRÍTICAS QUE FALTABAN ---
+    // --- ESTA ES LA FUNCIÓN QUE FALTABA ---
+    private fun sincronizarTokenFCM(session: SessionManager) {
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (!task.isSuccessful) {
+                Log.w("FCM", "Error obteniendo token FCM", task.exception)
+                return@addOnCompleteListener
+            }
+
+            // 1. Obtener el token nuevo del celular
+            val token = task.result
+            Log.d("FCM", "Token generado: $token")
+
+            // 2. Enviarlo a Laravel para actualizar el "viejo"
+            val authToken = session.fetchAuthToken()
+            if (authToken != null) {
+                lifecycleScope.launch {
+                    try {
+                        RetrofitClient.api.actualizarTokenFcm("Bearer $authToken", FcmTokenRequest(token))
+                        Log.d("FCM", "Token actualizado en el servidor correctamente.")
+                    } catch (e: Exception) {
+                        Log.e("FCM", "Fallo al enviar token al servidor: ${e.message}")
+                    }
+                }
+            }
+        }
+    }
 
     private fun crearCanalNotificaciones() {
-        // En Android 8.0+ las notificaciones DEBEN tener un canal asignado
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channelId = "seguridad_ueb_channel"
             val name = "Noticias Seguridad"
@@ -109,14 +146,12 @@ class MainActivity : ComponentActivity() {
             val channel = NotificationChannel(channelId, name, importance).apply {
                 description = descriptionText
             }
-            val notificationManager: NotificationManager =
-                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
         }
     }
 
     private fun solicitarPermisoNotificaciones() {
-        // En Android 13+ (Tiramisu) se debe pedir permiso en tiempo de ejecución
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
                 PackageManager.PERMISSION_GRANTED
