@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -16,6 +17,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.work.*
 import com.example.ejemplo.data.FcmTokenRequest
+import com.example.ejemplo.data.Noticia
 import com.example.ejemplo.data.RetrofitClient
 import com.example.ejemplo.data.SessionManager
 import com.google.firebase.messaging.FirebaseMessaging
@@ -26,36 +28,44 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 1. Canales y Permisos
+        // 1. Configuración Inicial
         crearCanalNotificaciones()
         solicitarPermisoNotificaciones()
-
         val session = SessionManager(this)
 
-        // 2. RECUPERADO: Si ya está logueado, actualizar el token inmediatamente
         if (session.fetchAuthToken() != null) {
             sincronizarTokenFCM(session)
         }
 
-        // Configuración del Worker (Tu código de fondo)
+        // Configuración Worker
         val workRequest = PeriodicWorkRequestBuilder<NotificationWorker>(15, TimeUnit.MINUTES)
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .build()
-            )
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .build()
-
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            "NoticiasBackgroundWork",
-            ExistingPeriodicWorkPolicy.KEEP,
-            workRequest
+            "NoticiasBackgroundWork", ExistingPeriodicWorkPolicy.KEEP, workRequest
         )
 
+        // 2. DETECTAR SI VENIMOS DE UNA NOTIFICACIÓN
+        // Buscamos el extra que pusimos en MyFirebaseMessagingService
+        val deepLinkNoticiaId = intent.getStringExtra("extra_noticia_id")
+        Log.d("MainActivity", "DeepLink recibido: $deepLinkNoticiaId")
+
         setContent {
+            // Estado para controlar qué noticia se seleccionó (Objeto completo o ID)
+            var selectedNoticiaObj by remember { mutableStateOf<Noticia?>(null) }
+            var selectedNoticiaId by remember { mutableStateOf<String?>(deepLinkNoticiaId) }
+
+            // Lógica de Pantalla Inicial
             var currentScreen by remember {
-                mutableStateOf(if (session.fetchAuthToken() != null) "home" else "login")
+                mutableStateOf(
+                    if (session.fetchAuthToken() != null) {
+                        if (deepLinkNoticiaId != null) "noticia_detalle" else "home"
+                    } else {
+                        "login"
+                    }
+                )
             }
+
             var homeStartTab by remember { mutableIntStateOf(0) }
 
             when (currentScreen) {
@@ -63,9 +73,7 @@ class MainActivity : ComponentActivity() {
                     LoginScreen(
                         onLoginSuccess = { token, name ->
                             session.saveAuthToken(token, name)
-                            // 3. RECUPERADO: Enviar token al entrar
                             sincronizarTokenFCM(session)
-
                             homeStartTab = 0
                             currentScreen = "home"
                         },
@@ -76,9 +84,7 @@ class MainActivity : ComponentActivity() {
                     RegisterScreen(
                         onRegisterSuccess = { token, name ->
                             session.saveAuthToken(token, name)
-                            // 3. RECUPERADO: Enviar token al registrarse
                             sincronizarTokenFCM(session)
-
                             homeStartTab = 0
                             currentScreen = "home"
                         },
@@ -97,9 +103,32 @@ class MainActivity : ComponentActivity() {
                         onNavigateToAlerts = { homeStartTab = 3; currentScreen = "mis_alertas" },
                         onNavigateToSettings = { homeStartTab = 3; currentScreen = "configuracion" },
                         onNavigateToSupport = { homeStartTab = 3; currentScreen = "soporte" },
-                        onNavigateToProfile = { homeStartTab = 3; currentScreen = "user_profile" }
+                        onNavigateToProfile = { homeStartTab = 3; currentScreen = "user_profile" },
+
+                        // IMPORTANTE: Modifica tu HomeScreen para pasar el objeto Noticia cuando se hace clic en la lista
+                        /* Debes asegurarte de que tu HomeScreen o NewsScreen tenga un callback:
+                           onNoticiaClick = { noticia ->
+                               selectedNoticiaObj = noticia
+                               selectedNoticiaId = null // Limpiamos ID
+                               currentScreen = "noticia_detalle"
+                           }
+                        */
                     )
                 }
+                "noticia_detalle" -> {
+                    NoticiaDetailScreen(
+                        noticiaObj = selectedNoticiaObj,
+                        noticiaId = selectedNoticiaId,
+                        onBack = {
+                            currentScreen = "home"
+                            // Al volver, limpiamos la selección para que no se quede pegada
+                            selectedNoticiaId = null
+                            selectedNoticiaObj = null
+                            homeStartTab = 0 // Volver a la pestaña de noticias
+                        }
+                    )
+                }
+                // ... Resto de pantallas igual ...
                 "reporte" -> ReportScreen(onBack = { currentScreen = "home" })
                 "historial" -> MyReportsScreen(onBack = { currentScreen = "home" })
                 "mis_alertas" -> MyAlertsScreen(onBack = { currentScreen = "home" })
@@ -110,27 +139,31 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // --- ESTA ES LA FUNCIÓN QUE FALTABA ---
+    // --- ESTO ES IMPORTANTE PARA CUANDO LA APP YA ESTÁ ABIERTA EN SEGUNDO PLANO ---
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent) // Actualizamos el intent actual
+        val newId = intent.getStringExtra("extra_noticia_id")
+        if (newId != null) {
+            // Aquí podrías forzar una recomposición o reinicio de la actividad si fuera necesario
+            // Pero normalmente con onCreate basta si la actividad se recrea.
+            // Si la actividad no se destruye, necesitarás observar el intent dentro del Composable
+            // o reiniciar la Activity:
+            recreate()
+        }
+    }
+
     private fun sincronizarTokenFCM(session: SessionManager) {
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            if (!task.isSuccessful) {
-                Log.w("FCM", "Error obteniendo token FCM", task.exception)
-                return@addOnCompleteListener
-            }
-
-            // 1. Obtener el token nuevo del celular
+            if (!task.isSuccessful) return@addOnCompleteListener
             val token = task.result
-            Log.d("FCM", "Token generado: $token")
-
-            // 2. Enviarlo a Laravel para actualizar el "viejo"
             val authToken = session.fetchAuthToken()
             if (authToken != null) {
                 lifecycleScope.launch {
                     try {
                         RetrofitClient.api.actualizarTokenFcm("Bearer $authToken", FcmTokenRequest(token))
-                        Log.d("FCM", "Token actualizado en el servidor correctamente.")
                     } catch (e: Exception) {
-                        Log.e("FCM", "Fallo al enviar token al servidor: ${e.message}")
+                        Log.e("FCM", "Error enviando token: ${e.message}")
                     }
                 }
             }
@@ -139,28 +172,16 @@ class MainActivity : ComponentActivity() {
 
     private fun crearCanalNotificaciones() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channelId = "seguridad_ueb_channel"
-            val name = "Noticias Seguridad"
-            val descriptionText = "Canal para noticias y alertas de seguridad"
-            val importance = NotificationManager.IMPORTANCE_HIGH
-            val channel = NotificationChannel(channelId, name, importance).apply {
-                description = descriptionText
-            }
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
+            val channel = NotificationChannel("seguridad_ueb_channel", "Noticias Seguridad", NotificationManager.IMPORTANCE_HIGH)
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(channel)
         }
     }
 
     private fun solicitarPermisoNotificaciones() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
-                PackageManager.PERMISSION_GRANTED
-            ) {
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                    101
-                )
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
             }
         }
     }

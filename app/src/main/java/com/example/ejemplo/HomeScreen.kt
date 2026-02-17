@@ -184,10 +184,17 @@ fun HomeScreen(
         }
     }
 
+    // --- CORRECCIÓN AQUÍ: Usamos los nuevos parámetros ---
     if (noticiaSeleccionada != null) {
-        NoticiaDetailScreen(noticia = noticiaSeleccionada!!, onBack = { noticiaSeleccionada = null })
+        NoticiaDetailScreen(
+            noticiaObj = noticiaSeleccionada,
+            noticiaId = null, // Como ya tenemos el objeto, no necesitamos el ID
+            onBack = { noticiaSeleccionada = null }
+        )
         return
     }
+    // ----------------------------------------------------
+
     if (activeCategory == "ruta_evacuacion") {
         EvacuationScreen(onBack = { activeCategory = null })
         return
