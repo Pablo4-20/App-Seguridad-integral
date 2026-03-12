@@ -153,7 +153,6 @@ fun RegisterScreen(
                                 isLoading = true
                                 scope.launch {
                                     try {
-                                        // AQUÍ ESTABA EL ERROR: Enviamos exactamente 5 argumentos
                                         val request = RegisterRequest(
                                             name = name,
                                             email = email,
@@ -176,12 +175,13 @@ fun RegisterScreen(
                         },
                         modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red), // <--- SE AGREGÓ EL COLOR ROJO AQUÍ
                         enabled = !isLoading
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                         } else {
-                            Text("REGISTRARSE", fontWeight = FontWeight.Bold)
+                            Text("REGISTRARSE", fontWeight = FontWeight.Bold, color = Color.White) // <--- SE ASEGURÓ TEXTO BLANCO
                         }
                     }
 

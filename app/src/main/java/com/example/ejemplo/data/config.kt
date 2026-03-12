@@ -7,10 +7,10 @@ object Config {
     //private const val BASE_IP = "http://10.0.2.2:8000"
 
     // MODO PRUEBA (Celular Físico - Cambia por la IP de tu PC):
-     private const val BASE_IP = "http://192.168.0.101:8000"
+    // private const val BASE_IP = "http://192.168.0.105:8000"
 
     // MODO PRODUCCIÓN (Servidor Real):
-    // private const val BASE_IP = "https://api.seguridad-ueb.com"
+     private const val BASE_IP = "http://http://sib.swueb.net/"
 
     // ----------------------------------------------------
 
