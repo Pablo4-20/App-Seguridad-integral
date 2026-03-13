@@ -44,7 +44,9 @@ data class Noticia(
     val contenido: String,
     val tipo: String, // recomendacion, protocolo, noticia
     val imagen_url: String?,
-    val created_at: String
+    val created_at: String,
+    val isPdf: Boolean = false,
+    val pdfUrl: String? = null
 )
 
 data class ReporteItem(
@@ -73,4 +75,12 @@ data class PuntoMapa(
     val latitud: String,
     val longitud: String,
     val tipo: String // seguro, peligro
+)
+
+data class Comunicado(
+    val id: Int,
+    val titulo: String,
+    val archivo_pdf: String,
+    val categoria: String,
+    val created_at: String
 )

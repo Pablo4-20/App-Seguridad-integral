@@ -58,6 +58,9 @@ interface ApiService {
     @GET("noticias")
     suspend fun obtenerNoticias(@Header("Authorization") token: String): List<Noticia>
 
+    @GET("comunicados")
+    suspend fun obtenerComunicados(): List<Comunicado>
+
     // Método para obtener UNA sola noticia por ID (Usado por notificaciones)
     // NOTA: Si tu BASE_URL ya incluye "/api/", esto llamará a ".../api/noticias/{id}"
     @GET("noticias/{id}")

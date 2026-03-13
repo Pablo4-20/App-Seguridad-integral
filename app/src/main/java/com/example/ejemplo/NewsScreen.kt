@@ -49,8 +49,30 @@ fun NewsScreen(tipoFiltro: String, onBack: () -> Unit) { // <--- AHORA RECIBE UN
             val session = SessionManager(context)
             val token = session.fetchAuthToken()
             if (token != null) {
-                val respuesta = RetrofitClient.api.obtenerNoticias("Bearer $token")
-                listaCompleta = respuesta
+                val noticiasRes = RetrofitClient.api.obtenerNoticias("Bearer $token")
+                val comunicadosRes = try { RetrofitClient.api.obtenerComunicados() } catch(e:Exception) { emptyList() }
+
+                val pdfsMapeados = comunicadosRes.map { c ->
+                    val catFront = when(c.categoria) {
+                        "plan_estudiantil" -> "noticia"
+                        "protocolos_seguridad" -> "protocolo"
+                        "recomendaciones" -> "recomendacion"
+                        "mochila_emergencia" -> "mochila"
+                        "alertas_avisos" -> "notificacion"
+                        else -> "noticia"
+                    }
+                    Noticia(
+                        id = c.id + 10000,
+                        titulo = c.titulo,
+                        contenido = "📄 DOCUMENTO PDF: Toca para descargar o visualizar.",
+                        tipo = catFront,
+                        imagen_url = null,
+                        created_at = c.created_at,
+                        isPdf = true,
+                        pdfUrl = c.archivo_pdf
+                    )
+                }
+                listaCompleta = (noticiasRes + pdfsMapeados).sortedByDescending { it.created_at }
             }
             isLoading = false
         } catch (e: Exception) {
@@ -124,14 +146,25 @@ fun NoticiaItem(noticia: Noticia) {
         else -> Color(0xFF1976D2)
     }
 
+    val context = LocalContext.current
     Card(
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = androidx.compose.foundation.BorderStroke(1.dp, colorBorde.copy(alpha = 0.5f)), // Borde sutil
+        border = androidx.compose.foundation.BorderStroke(1.dp, colorBorde.copy(alpha = 0.5f)),
         elevation = CardDefaults.cardElevation(2.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { itemExpanded = !itemExpanded }
+            .clickable {
+                if (noticia.isPdf && noticia.pdfUrl != null) {
+                    // --- CORRECCIÓN AQUÍ: RUTA SEGURA PARA PDF ---
+                    val fileName = noticia.pdfUrl.substringAfterLast("/")
+                    val finalUrl = "http://sib.swueb.net/api/documento/$fileName"
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(finalUrl))
+                    context.startActivity(intent)
+                } else {
+                    itemExpanded = !itemExpanded
+                }
+            }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // Título y Fecha
@@ -163,14 +196,16 @@ fun NoticiaItem(noticia: Noticia) {
                 )
             }
 
-            // Texto "Ver más" o "Ver menos"
-            Text(
-                text = if(itemExpanded) "Ver menos" else "Ver más...",
-                fontSize = 12.sp,
-                color = colorBorde,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 8.dp).align(Alignment.End)
-            )
+            // Texto "Ver más" o "Ver menos" (Oculto si es PDF ya que al tocar abre el link)
+            if (!noticia.isPdf) {
+                Text(
+                    text = if(itemExpanded) "Ver menos" else "Ver más...",
+                    fontSize = 12.sp,
+                    color = colorBorde,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 8.dp).align(Alignment.End)
+                )
+            }
         }
     }
 }
