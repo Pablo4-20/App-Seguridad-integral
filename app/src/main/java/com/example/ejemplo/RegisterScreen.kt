@@ -161,12 +161,23 @@ fun RegisterScreen(
                                             telefono = telefono
                                         )
 
-                                        val response = RetrofitClient.api.register(request)
+                                        // Llamada a la API
+                                        RetrofitClient.api.register(request)
 
-                                        Toast.makeText(context, "Cuenta creada con éxito", Toast.LENGTH_SHORT).show()
-                                        onRegisterSuccess(response.access_token, response.user.nombre)
+                                        // Si llega aquí, es porque el registro fue un éxito (código 200)
+                                        Toast.makeText(
+                                            context,
+                                            "Registro exitoso. Se ha enviado un enlace de verificación a su correo.",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+
+                                        // Regresamos al usuario a la pantalla de Login para que espere
+                                        // a verificar su correo antes de intentar entrar
+                                        onBack()
+
                                     } catch (e: Exception) {
-                                        Toast.makeText(context, "Error al registrar. Verifique sus datos.", Toast.LENGTH_LONG).show()
+                                        // Aquí sí entraremos si el correo ya existe o la cédula está duplicada
+                                        Toast.makeText(context, "Error al registrar. Verifique sus datos o intente con otro correo.", Toast.LENGTH_LONG).show()
                                     } finally {
                                         isLoading = false
                                     }
@@ -175,13 +186,13 @@ fun RegisterScreen(
                         },
                         modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red), // <--- SE AGREGÓ EL COLOR ROJO AQUÍ
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                         enabled = !isLoading
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                         } else {
-                            Text("REGISTRARSE", fontWeight = FontWeight.Bold, color = Color.White) // <--- SE ASEGURÓ TEXTO BLANCO
+                            Text("REGISTRARSE", fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
 
