@@ -28,7 +28,17 @@ data class RegisterResponse(
 )
 
 // --- NOTIFICACIONES ---
-// Arregla el error "Too many arguments for constructor(): FcmTokenRequest"
 data class FcmTokenRequest(
     val fcm_token: String
 )
+
+// --- RECUPERACIÓN DE CONTRASEÑA (NUEVO) ---
+data class ForgotPasswordRequest(val cedula: String)
+data class ForgotPasswordResponse(val message: String)
+
+data class ResetPasswordRequest(
+    val email: String,
+    val token: String,
+    val password: String
+)
+data class ResetPasswordResponse(val message: String)

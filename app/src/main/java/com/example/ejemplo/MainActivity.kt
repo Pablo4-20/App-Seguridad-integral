@@ -48,25 +48,37 @@ class MainActivity : ComponentActivity() {
             "NoticiasBackgroundWork", ExistingPeriodicWorkPolicy.KEEP, workRequest
         )
 
-        // 2. DETECTAR SI VENIMOS DE UN EVENTO (Noticia o Inactivación de cuenta)
+        // 2. DETECTAR INTENTS Y DEEP LINKS
         val forceLogoutMessage = intent.getStringExtra("force_logout_message")
         val deepLinkNoticiaId = intent.getStringExtra("extra_noticia_id")
 
-        Log.d("MainActivity", "DeepLink recibido: $deepLinkNoticiaId")
-        Log.d("MainActivity", "Mensaje cierre forzado: $forceLogoutMessage")
+        // Deep Link para Reset Password
+        val uri = intent.data
+        var deepLinkResetToken: String? = null
+        var deepLinkResetEmail: String? = null
+
+        if (uri != null && uri.scheme == "seguridadintegral" && uri.host == "reset-password") {
+            deepLinkResetToken = uri.path?.removePrefix("/")
+            deepLinkResetEmail = uri.getQueryParameter("email")
+            Log.d("MainActivity", "DeepLink Reset: token=$deepLinkResetToken, email=$deepLinkResetEmail")
+        }
 
         setContent {
-            // ESTADO PARA LA ALERTA DE INACTIVACIÓN
             var showLogoutDialog by remember { mutableStateOf(forceLogoutMessage != null) }
 
-            // Estado para controlar qué noticia se seleccionó
             var selectedNoticiaObj by remember { mutableStateOf<Noticia?>(null) }
             var selectedNoticiaId by remember { mutableStateOf<String?>(deepLinkNoticiaId) }
+
+            // Estados para el reseteo de contraseña
+            var resetToken by remember { mutableStateOf(deepLinkResetToken) }
+            var resetEmail by remember { mutableStateOf(deepLinkResetEmail) }
 
             // Lógica de Pantalla Inicial
             var currentScreen by remember {
                 mutableStateOf(
-                    if (session.fetchAuthToken() != null) {
+                    if (resetToken != null && resetEmail != null) {
+                        "reset_password"
+                    } else if (session.fetchAuthToken() != null) {
                         if (deepLinkNoticiaId != null) "noticia_detalle" else "home"
                     } else {
                         "login"
@@ -76,7 +88,6 @@ class MainActivity : ComponentActivity() {
 
             var homeStartTab by remember { mutableIntStateOf(0) }
 
-            // DIBUJAR LA ALERTA DE CUENTA INACTIVA
             if (showLogoutDialog) {
                 AlertDialog(
                     onDismissRequest = { showLogoutDialog = false },
@@ -99,7 +110,8 @@ class MainActivity : ComponentActivity() {
                             homeStartTab = 0
                             currentScreen = "home"
                         },
-                        onNavigateToRegister = { currentScreen = "register" }
+                        onNavigateToRegister = { currentScreen = "register" },
+                        onNavigateToForgotPassword = { currentScreen = "forgot_password" } // NUEVO
                     )
                 }
                 "register" -> {
@@ -112,6 +124,27 @@ class MainActivity : ComponentActivity() {
                         },
                         onBack = { currentScreen = "login" }
                     )
+                }
+                "forgot_password" -> {
+                    ForgotPasswordScreen(
+                        onBack = { currentScreen = "login" }
+                    )
+                }
+                "reset_password" -> {
+                    if (resetToken != null && resetEmail != null) {
+                        ResetPasswordScreen(
+                            token = resetToken!!,
+                            email = resetEmail!!,
+                            onSuccess = {
+                                // Limpiamos y volvemos al login
+                                resetToken = null
+                                resetEmail = null
+                                currentScreen = "login"
+                            }
+                        )
+                    } else {
+                        currentScreen = "login"
+                    }
                 }
                 "home" -> {
                     HomeScreen(
@@ -150,13 +183,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // --- MANEJO DE INTENTS EN SEGUNDO PLANO ---
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-
-        // Si llega la orden de cierre o una noticia mientras la app está abierta, recreamos la vista
-        if (intent.getStringExtra("force_logout_message") != null || intent.getStringExtra("extra_noticia_id") != null) {
+        val uri = intent.data
+        if (intent.getStringExtra("force_logout_message") != null ||
+            intent.getStringExtra("extra_noticia_id") != null ||
+            (uri != null && uri.scheme == "seguridadintegral" && uri.host == "reset-password")) {
             recreate()
         }
     }

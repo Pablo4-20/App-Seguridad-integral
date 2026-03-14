@@ -29,19 +29,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ejemplo.components.NoInternetScreen
 import com.example.ejemplo.utils.NetworkUtils
-// IMPORTS DE DATOS
 import com.example.ejemplo.data.LoginRequest
 import com.example.ejemplo.data.RetrofitClient
 import com.example.ejemplo.data.FcmTokenRequest
-// IMPORTS DE FIREBASE Y CORRUTINAS
 import com.google.firebase.messaging.FirebaseMessaging
-import kotlinx.coroutines.launch // <--- ESTE ES EL QUE FALTABA
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
     onLoginSuccess: (String, String) -> Unit,
-    onNavigateToRegister: () -> Unit // Parámetro para navegar al registro
+    onNavigateToRegister: () -> Unit,
+    onNavigateToForgotPassword: () -> Unit // NUEVO PARÁMETRO
 ) {
 
     val context = LocalContext.current
@@ -163,7 +162,17 @@ fun LoginScreen(
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // BOTÓN DE OLVIDASTE CONTRASEÑA
+                    TextButton(
+                        onClick = onNavigateToForgotPassword,
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("¿Olvidaste tu contraseña?", color = DarkBlue, fontSize = 14.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     Button(
                         onClick = {
@@ -178,31 +187,19 @@ fun LoginScreen(
                                 isLoading = true
                                 scope.launch {
                                     try {
-                                        // 1. LOGIN
                                         val request = LoginRequest(email, password)
                                         val response = RetrofitClient.api.login(request)
 
-                                        // 2. OBTENER Y ENVIAR TOKEN FCM
                                         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
                                             if (task.isSuccessful) {
                                                 val tokenFcm = task.result
-                                                Log.d("FCM", "Token obtenido: $tokenFcm")
-
-                                                // Necesitamos 'scope.launch' porque addOnCompleteListener es código Java/Callback
-                                                // y no una función suspendida directa.
                                                 scope.launch {
                                                     try {
-                                                        RetrofitClient.api.actualizarTokenFcm(
-                                                            "Bearer ${response.access_token}",
-                                                            FcmTokenRequest(tokenFcm)
-                                                        )
-                                                        Log.d("FCM", "Token enviado al servidor")
+                                                        RetrofitClient.api.actualizarTokenFcm("Bearer ${response.access_token}", FcmTokenRequest(tokenFcm))
                                                     } catch (e: Exception) {
                                                         Log.e("FCM", "Error enviando token", e)
                                                     }
                                                 }
-                                            } else {
-                                                Log.w("FCM", "Error obteniendo token FCM", task.exception)
                                             }
                                         }
 

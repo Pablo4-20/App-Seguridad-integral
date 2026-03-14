@@ -12,7 +12,7 @@ import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
-import retrofit2.http.Query // <--- NUEVO IMPORT REQUERIDO
+import retrofit2.http.Query
 
 interface ApiService {
     // --- AUTENTICACIÓN ---
@@ -22,8 +22,14 @@ interface ApiService {
     @POST("register")
     suspend fun register(@Body request: RegisterRequest): RegisterResponse
 
+    // --- RECUPERACIÓN DE CONTRASEÑA (NUEVO) ---
+    @POST("forgot-password")
+    suspend fun forgotPassword(@Body request: ForgotPasswordRequest): ForgotPasswordResponse
+
+    @POST("reset-password")
+    suspend fun resetPassword(@Body request: ResetPasswordRequest): ResetPasswordResponse
+
     // --- VALIDACIONES EN TIEMPO REAL ---
-    // Nota: Las rutas ("check-email", etc.) deben coincidir con las que crees en Laravel
     @GET("check-email")
     suspend fun checkEmail(@Query("email") email: String)
 
@@ -73,7 +79,6 @@ interface ApiService {
     @GET("comunicados")
     suspend fun obtenerComunicados(): List<Comunicado>
 
-    // Método para obtener UNA sola noticia por ID (Usado por notificaciones)
     @GET("noticias/{id}")
     fun getNoticia(@Path("id") id: Int): Call<Noticia>
 
