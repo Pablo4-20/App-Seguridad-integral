@@ -2,7 +2,7 @@ package com.example.ejemplo.data
 
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
-import retrofit2.Call // <--- FALTABA ESTO
+import retrofit2.Call
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
@@ -11,7 +11,8 @@ import retrofit2.http.Header
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
-import retrofit2.http.Path // <--- FALTABA ESTO
+import retrofit2.http.Path
+import retrofit2.http.Query // <--- NUEVO IMPORT REQUERIDO
 
 interface ApiService {
     // --- AUTENTICACIÓN ---
@@ -20,6 +21,17 @@ interface ApiService {
 
     @POST("register")
     suspend fun register(@Body request: RegisterRequest): RegisterResponse
+
+    // --- VALIDACIONES EN TIEMPO REAL ---
+    // Nota: Las rutas ("check-email", etc.) deben coincidir con las que crees en Laravel
+    @GET("check-email")
+    suspend fun checkEmail(@Query("email") email: String)
+
+    @GET("check-cedula")
+    suspend fun checkCedula(@Query("cedula") cedula: String)
+
+    @GET("check-telefono")
+    suspend fun checkTelefono(@Query("telefono") telefono: String)
 
     // --- PERFIL Y TOKEN ---
     @GET("perfil")
@@ -62,7 +74,6 @@ interface ApiService {
     suspend fun obtenerComunicados(): List<Comunicado>
 
     // Método para obtener UNA sola noticia por ID (Usado por notificaciones)
-    // NOTA: Si tu BASE_URL ya incluye "/api/", esto llamará a ".../api/noticias/{id}"
     @GET("noticias/{id}")
     fun getNoticia(@Path("id") id: Int): Call<Noticia>
 
@@ -72,7 +83,6 @@ interface ApiService {
 }
 
 object RetrofitClient {
-    // Asegúrate de que Config.API_URL termine en "/" (ej: "http://192.168.1.10:8000/api/")
     private const val BASE_URL = "http://sib.swueb.net/api/"
 
     val api: ApiService by lazy {

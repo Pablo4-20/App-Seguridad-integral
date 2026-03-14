@@ -11,6 +11,9 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -45,13 +48,18 @@ class MainActivity : ComponentActivity() {
             "NoticiasBackgroundWork", ExistingPeriodicWorkPolicy.KEEP, workRequest
         )
 
-        // 2. DETECTAR SI VENIMOS DE UNA NOTIFICACIÓN
-        // Buscamos el extra que pusimos en MyFirebaseMessagingService
+        // 2. DETECTAR SI VENIMOS DE UN EVENTO (Noticia o Inactivación de cuenta)
+        val forceLogoutMessage = intent.getStringExtra("force_logout_message")
         val deepLinkNoticiaId = intent.getStringExtra("extra_noticia_id")
+
         Log.d("MainActivity", "DeepLink recibido: $deepLinkNoticiaId")
+        Log.d("MainActivity", "Mensaje cierre forzado: $forceLogoutMessage")
 
         setContent {
-            // Estado para controlar qué noticia se seleccionó (Objeto completo o ID)
+            // ESTADO PARA LA ALERTA DE INACTIVACIÓN
+            var showLogoutDialog by remember { mutableStateOf(forceLogoutMessage != null) }
+
+            // Estado para controlar qué noticia se seleccionó
             var selectedNoticiaObj by remember { mutableStateOf<Noticia?>(null) }
             var selectedNoticiaId by remember { mutableStateOf<String?>(deepLinkNoticiaId) }
 
@@ -67,6 +75,20 @@ class MainActivity : ComponentActivity() {
             }
 
             var homeStartTab by remember { mutableIntStateOf(0) }
+
+            // DIBUJAR LA ALERTA DE CUENTA INACTIVA
+            if (showLogoutDialog) {
+                AlertDialog(
+                    onDismissRequest = { showLogoutDialog = false },
+                    title = { Text("Cuenta Inactivada") },
+                    text = { Text(forceLogoutMessage ?: "Tu cuenta ha sido cerrada por seguridad.") },
+                    confirmButton = {
+                        Button(onClick = { showLogoutDialog = false }) {
+                            Text("Entendido")
+                        }
+                    }
+                )
+            }
 
             when (currentScreen) {
                 "login" -> {
@@ -103,16 +125,7 @@ class MainActivity : ComponentActivity() {
                         onNavigateToAlerts = { homeStartTab = 3; currentScreen = "mis_alertas" },
                         onNavigateToSettings = { homeStartTab = 3; currentScreen = "configuracion" },
                         onNavigateToSupport = { homeStartTab = 3; currentScreen = "soporte" },
-                        onNavigateToProfile = { homeStartTab = 3; currentScreen = "user_profile" },
-
-                        // IMPORTANTE: Modifica tu HomeScreen para pasar el objeto Noticia cuando se hace clic en la lista
-                        /* Debes asegurarte de que tu HomeScreen o NewsScreen tenga un callback:
-                           onNoticiaClick = { noticia ->
-                               selectedNoticiaObj = noticia
-                               selectedNoticiaId = null // Limpiamos ID
-                               currentScreen = "noticia_detalle"
-                           }
-                        */
+                        onNavigateToProfile = { homeStartTab = 3; currentScreen = "user_profile" }
                     )
                 }
                 "noticia_detalle" -> {
@@ -121,14 +134,12 @@ class MainActivity : ComponentActivity() {
                         noticiaId = selectedNoticiaId,
                         onBack = {
                             currentScreen = "home"
-                            // Al volver, limpiamos la selección para que no se quede pegada
                             selectedNoticiaId = null
                             selectedNoticiaObj = null
-                            homeStartTab = 0 // Volver a la pestaña de noticias
+                            homeStartTab = 0
                         }
                     )
                 }
-                // ... Resto de pantallas igual ...
                 "reporte" -> ReportScreen(onBack = { currentScreen = "home" })
                 "historial" -> MyReportsScreen(onBack = { currentScreen = "home" })
                 "mis_alertas" -> MyAlertsScreen(onBack = { currentScreen = "home" })
@@ -139,16 +150,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // --- ESTO ES IMPORTANTE PARA CUANDO LA APP YA ESTÁ ABIERTA EN SEGUNDO PLANO ---
+    // --- MANEJO DE INTENTS EN SEGUNDO PLANO ---
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        setIntent(intent) // Actualizamos el intent actual
-        val newId = intent.getStringExtra("extra_noticia_id")
-        if (newId != null) {
-            // Aquí podrías forzar una recomposición o reinicio de la actividad si fuera necesario
-            // Pero normalmente con onCreate basta si la actividad se recrea.
-            // Si la actividad no se destruye, necesitarás observar el intent dentro del Composable
-            // o reiniciar la Activity:
+        setIntent(intent)
+
+        // Si llega la orden de cierre o una noticia mientras la app está abierta, recreamos la vista
+        if (intent.getStringExtra("force_logout_message") != null || intent.getStringExtra("extra_noticia_id") != null) {
             recreate()
         }
     }
